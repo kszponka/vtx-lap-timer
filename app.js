@@ -18,9 +18,10 @@
     $$('section[data-route]').forEach(sec => sec.hidden = (sec.dataset.route!==r));
     Object.entries(tabs).forEach(([k,btn])=> btn && btn.classList.toggle('active', k===r));
   }
-  addEventListener('hashchange', applyRoute);
-  if(!location.hash) location.hash = '#/history';
-  applyRoute();
+addEventListener('hashchange', applyRoute);
+// domyślnie otwieraj New Race
+if (!location.hash) location.hash = '#/new';
+applyRoute();
 
   /* ---------------- Channel grid: Band E only (E1..E8) ---------------- */
   const chGrid = document.getElementById('chGridE');
