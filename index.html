@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0d10" />
+  <title>RX5808 Panel</title>
+  <style>
+    :root{
+      --bg:#0b0d10; --bg-elev:#11151b; --card:#12161c; --fg:#e7edf3; --muted:#9aa6b2; --border:#1f2530;
+      --accent:#5ad1ff; --radius:14px; --shadow:0 10px 24px rgba(0,0,0,.25); --tap:44px; --mono:ui-monospace,Menlo,Consolas,monospace;
+    }
+    body{margin:0;background:var(--bg);color:var(--fg);font:500 16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+    .app{display:grid;grid-template-rows:auto auto 1fr;min-height:100dvh}
+    header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg-elev);border-bottom:1px solid var(--border)}
+    .status{display:flex;gap:8px;color:var(--muted);font-size:13px}
+    .led{width:10px;height:10px;border-radius:50%;background:#666}
+    .led.ok{background:#80ed99}
+
+    /* TOP: exactly three buttons */
+    .topbar{display:flex;gap:8px;padding:8px 12px;background:var(--bg-elev);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
+    .topbar button{flex:1;min-height:var(--tap);border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--muted)}
+    .topbar button.active{color:var(--fg);border-color:var(--accent)}
+
+    .tabbtn{min-height:var(--tap);border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--muted);padding:8px 14px}
+    .tabbtn.primary{color:var(--fg);border-color:var(--accent)}
+
+    main{padding:12px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px}
+    .list{display:grid;gap:8px}
+    .item{padding:8px;border:1px solid var(--border);border-radius:12px;background:var(--bg-elev)}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .right{margin-left:auto}
+    .mono{font-family:var(--mono)}
+
+    .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--card);padding:8px 12px;border-radius:999px;opacity:0;transition:.2s}
+    .toast.show{opacity:1}
+
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center}
+    .modal.show{display:flex}
+    .sheet{width:100%;max-width:900px;max-height:85dvh;background:var(--card);border:1px solid var(--border);border-radius:20px 20px 0 0;box-shadow:var(--shadow);overflow:auto;padding:14px}
+
+    .ch-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-top:8px}
+    .ch{aspect-ratio:1/1;border:1px solid var(--border);border-radius:10px;background:var(--bg-elev);display:flex;align-items:center;justify-content:center;font-weight:700;cursor:pointer}
+    .ch.active{outline:2px solid var(--accent)}
+
+    .pretty{display:flex;flex-direction:column;gap:6px;min-width:180px}
+    .pretty label{font-size:13px;color:var(--muted)}
+    .pretty input[type=number]{min-height:var(--tap);border:1px solid var(--border);border-radius:12px;background:var(--bg-elev);color:var(--fg);padding:8px 12px;text-align:center;width:110px}
+    .pretty input[type=number]::-webkit-outer-spin-button,
+    .pretty input[type=number]::-webkit-inner-spin-button{ -webkit-appearance: none; margin: 0 }
+    .pretty input[type=number]{ -moz-appearance: textfield }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">RX5808 Panel</div>
+    <div class="status"><span class="led" id="led"></span><span id="statusText">offline</span><span id="channelBadge">E1</span></div>
+  </header>
+
+  <div class="topbar" role="tablist" aria-label="Navigation">
+    <button id="btnTabHistory" role="tab">History</button>
+    <button id="btnTabSettings" role="tab">Settings</button>
+    <button id="btnTabNew" role="tab">NewRace</button>
+  </div>
+
+  <main id="view">
+    <section data-route="history" hidden>
+      <div class="card">
+        <h2>History</h2>
+        <div id="races-history" class="list"></div>
+      </div>
+    </section>
+
+    <section data-route="settings" hidden>
+      <div class="card">
+        <h2>Settings</h2>
+        <div class="row"><div>Channel:</div><div class="mono" id="channelLabel">E1</div></div>
+        <div class="ch-grid" id="chGridE" aria-label="Band E channels"></div>
+      </div>
+      <div class="card">
+        <h3>Calibration</h3>
+        <div class="row" style="gap:8px">
+          <button id="btnCalStart" class="tabbtn">Start Calibration</button>
+          <button id="btnCalStop" class="tabbtn">Stop Calibration</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div><small>Baseline</small><div class="mono" id="calBase">-- dB</div></div>
+          <div><small>Peak</small><div class="mono" id="calPeak">-- dB</div></div>
+          <div class="right"><small>Gate</small><div class="mono" id="calGate">-- dB</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section data-route="new" hidden>
+      <div class="card">
+        <h2>New Race</h2>
+        <div class="row">
+          <div class="pretty"><label>Laps</label><input id="lapsTarget" type="number" min="1" value="5"></div>
+          <div class="pretty"><label>Start delay (s)</label><input id="startDelay" type="number" min="0" value="2"></div>
+          <input type="hidden" id="minLap" value="7.0">
+        </div>
+        <div class="row" style="margin-top:8px; gap:8px">
+          <button id="btnStart" class="tabbtn primary">Start</button>
+          <button id="btnStop" class="tabbtn">Stop</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Live</h3>
+        <div class="row"><div><small>Lap</small><div id="liveLap" class="mono">-</div></div>
+             <div><small>Last</small><div id="liveLast" class="mono">--.-s</div></div>
+             <div><small>Best</small><div id="liveBest" class="mono">--.-s</div></div>
+             <div class="right"><small>Total</small><div id="liveTotal" class="mono">00:00.0</div></div></div>
+        <div id="lastLaps" class="list" style="margin-top:8px"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="modal" id="raceModal" aria-hidden="true" role="dialog" aria-label="Race details">
+  <div class="sheet">
+    <div class="row"><h3 id="raceTitle">Race</h3><div class="right"></div></div>
+    <div class="item" id="raceSummary"></div>
+    <div class="list" id="raceLaps"></div>
+    <div class="row" style="margin-top:8px;justify-content:flex-end"><button id="closeModal" class="tabbtn">Close</button></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
